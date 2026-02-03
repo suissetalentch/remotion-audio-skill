@@ -12,6 +12,8 @@ export const VoiceOver = forwardRef<VoiceOverRefHandle, VoiceOverProps>(
   (
     {
       text,
+      src,
+      durationInFrames: propDurationInFrames,
       voiceId,
       model,
       voiceSettings,
@@ -28,17 +30,26 @@ export const VoiceOver = forwardRef<VoiceOverRefHandle, VoiceOverProps>(
     },
     ref
   ) => {
-    const { audioSrc, durationInFrames, isLoading, error, words } = useVoiceOver({
+    // If src is provided, use it directly (prerendered mode)
+    // Otherwise, use the hook to generate audio dynamically
+    const hookResult = useVoiceOver({
       text,
       voiceId,
       model,
       voiceSettings,
       language,
-      transcribe: true,
+      transcribe: !src, // Skip transcription if using prerendered audio
       seed,
       previousText,
       nextText,
     });
+
+    // Use prerendered src/duration or hook result
+    const audioSrc = src || hookResult.audioSrc;
+    const durationInFrames = propDurationInFrames || hookResult.durationInFrames;
+    const isLoading = src ? false : hookResult.isLoading;
+    const error = src ? null : hookResult.error;
+    const words = hookResult.words;
 
     // Calculate effective duration after trimming
     const effectiveDuration = Math.max(0, durationInFrames - trimBefore - trimAfter);

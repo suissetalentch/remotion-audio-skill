@@ -10,7 +10,15 @@ import { resetCacheManager, getCacheManager } from '../../../src/cache/cache-man
 // Create mock audio data
 const mockAudioBuffer = new ArrayBuffer(16000); // ~1 second at 128kbps
 
-// Mock URL.createObjectURL for Node.js environment
+// Mock fs module
+vi.mock('fs', () => ({
+  existsSync: vi.fn(() => true),
+  mkdirSync: vi.fn(),
+  writeFileSync: vi.fn(),
+  readFileSync: vi.fn(() => Buffer.from(mockAudioBuffer)),
+}));
+
+// Mock URL.createObjectURL for Node.js environment (legacy, kept for compatibility)
 let urlCounter = 0;
 globalThis.URL.createObjectURL = vi.fn(() => `blob:mock-url-${++urlCounter}`);
 globalThis.URL.revokeObjectURL = vi.fn();
@@ -78,7 +86,7 @@ describe('prerenderAudio', () => {
 
     expect(result.audioMeta.voiceOvers).toEqual({});
     expect(result.audioMeta.soundEffects).toEqual({});
-    expect(result.audioMeta.backgroundMusic).toBeUndefined();
+    expect(result.audioMeta.backgroundMusic).toBeNull();
   });
 
   it('should process single voice-over', async () => {
@@ -92,7 +100,7 @@ describe('prerenderAudio', () => {
     const result = await prerenderAudio(config);
 
     expect(result.audioMeta.voiceOvers['intro']).toBeDefined();
-    expect(result.audioMeta.voiceOvers['intro'].src).toMatch(/^blob:/);
+    expect(result.audioMeta.voiceOvers['intro'].src).toMatch(/^audio\/voice-/);
     expect(result.audioMeta.voiceOvers['intro'].durationFrames).toBeGreaterThan(0);
     expect(result.audioMeta.voiceOvers['intro'].transcription).toHaveLength(2);
   });
@@ -125,7 +133,7 @@ describe('prerenderAudio', () => {
     const result = await prerenderAudio(config);
 
     expect(result.audioMeta.backgroundMusic).toBeDefined();
-    expect(result.audioMeta.backgroundMusic!.src).toMatch(/^blob:/);
+    expect(result.audioMeta.backgroundMusic!.src).toMatch(/^audio\/music-/);
     expect(result.audioMeta.backgroundMusic!.durationFrames).toBeGreaterThan(0);
   });
 

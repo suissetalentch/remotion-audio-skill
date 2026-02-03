@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { STTWord } from '../types';
 import { getTTSService } from '../services/tts.service';
 import { getMusicService } from '../services/music.service';
@@ -10,129 +12,29 @@ import { isMusicPreset, getMusicPreset } from '../presets/music-presets';
 import { isSFXPreset, getSFXPreset } from '../presets/sfx-presets';
 import { getConfig } from '../config';
 
-/**
- * Word alignment with frame information
- */
-export interface WordAlignment {
-  word: string;
-  startMs: number;
-  endMs: number;
-  startFrame: number;
-  endFrame: number;
-}
+// Directory for prerendered audio files (relative to project root)
+const AUDIO_OUTPUT_DIR = 'public/audio';
+// Import only types used in this file
+import type {
+  WordAlignment,
+  PrerenderConfig,
+  VoiceOverMeta,
+  BackgroundMusicMeta,
+  PrerenderResult,
+} from './types';
 
-/**
- * Voice-over configuration for prerender
- */
-export interface VoiceOverConfig {
-  /** Unique identifier for this voice-over */
-  id: string;
-  /** Text to speak */
-  text: string;
-  /** Start frame (optional, for sequencing) */
-  from?: number;
-  /** Voice ID or preset name */
-  voiceId?: string;
-  /** Model to use */
-  model?: string;
-  /** Language code */
-  language?: string;
-  /** Voice preset name */
-  preset?: string;
-}
-
-/**
- * Background music configuration for prerender
- */
-export interface BackgroundMusicConfig {
-  /** Prompt or preset name */
-  prompt: string;
-  /** Duration in seconds */
-  durationSeconds?: number;
-}
-
-/**
- * Sound effect configuration for prerender
- */
-export interface SoundEffectConfig {
-  /** Unique identifier for this SFX */
-  id: string;
-  /** Prompt or preset name */
-  prompt: string;
-  /** Start frame */
-  from: number;
-  /** Duration in seconds (optional) */
-  durationSeconds?: number;
-}
-
-/**
- * Prerender configuration
- */
-export interface PrerenderConfig {
-  /** Frames per second */
-  fps: number;
-  /** Voice-over configurations */
-  voiceOvers?: VoiceOverConfig[];
-  /** Background music configuration */
-  backgroundMusic?: BackgroundMusicConfig;
-  /** Sound effect configurations */
-  soundEffects?: SoundEffectConfig[];
-}
-
-/**
- * Voice-over metadata result
- */
-export interface VoiceOverMeta {
-  /** Audio source URL or path */
-  src: string;
-  /** Duration in frames */
-  durationFrames: number;
-  /** Duration in milliseconds */
-  durationMs: number;
-  /** Word-level transcription */
-  transcription: WordAlignment[];
-}
-
-/**
- * Background music metadata result
- */
-export interface BackgroundMusicMeta {
-  /** Audio source URL or path */
-  src: string;
-  /** Duration in frames */
-  durationFrames: number;
-  /** Duration in milliseconds */
-  durationMs: number;
-}
-
-/**
- * Sound effect metadata result
- */
-export interface SoundEffectMeta {
-  /** Audio source URL or path */
-  src: string;
-  /** Duration in frames */
-  durationFrames: number;
-  /** Duration in milliseconds */
-  durationMs: number;
-}
-
-/**
- * Complete prerender result
- */
-export interface PrerenderResult {
-  /** Total duration in frames (based on longest audio + padding) */
-  totalDurationFrames: number;
-  /** Audio metadata organized by type */
-  audioMeta: {
-    /** Voice-overs keyed by id */
-    voiceOvers: Record<string, VoiceOverMeta>;
-    /** Background music (if configured) */
-    backgroundMusic?: BackgroundMusicMeta;
-    /** Sound effects keyed by id */
-    soundEffects: Record<string, SoundEffectMeta>;
-  };
-}
+// Re-export all types for backwards compatibility
+export type {
+  WordAlignment,
+  VoiceOverConfig,
+  BackgroundMusicConfig,
+  SoundEffectConfig,
+  PrerenderConfig,
+  VoiceOverMeta,
+  BackgroundMusicMeta,
+  SoundEffectMeta,
+  PrerenderResult,
+} from './types';
 
 /**
  * Convert STTWord to WordAlignment with frame information
@@ -204,6 +106,7 @@ export async function prerenderAudio(config: PrerenderConfig): Promise<Prerender
     totalDurationFrames: 0,
     audioMeta: {
       voiceOvers: {},
+      backgroundMusic: null,
       soundEffects: {},
     },
   };
@@ -257,9 +160,17 @@ export async function prerenderAudio(config: PrerenderConfig): Promise<Prerender
       console.warn(`Transcription failed for voice-over "${vo.id}"`);
     }
 
-    // Create blob URL for the audio
-    const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-    const src = URL.createObjectURL(blob);
+    // Save audio file to public/audio/ for staticFile() access
+    const audioDir = path.resolve(process.cwd(), AUDIO_OUTPUT_DIR);
+    if (!fs.existsSync(audioDir)) {
+      fs.mkdirSync(audioDir, { recursive: true });
+    }
+    const audioFileName = `voice-${vo.id}-${cacheKey.slice(0, 8)}.mp3`;
+    const audioFilePath = path.join(audioDir, audioFileName);
+    fs.writeFileSync(audioFilePath, Buffer.from(audioBuffer));
+
+    // Return path for staticFile() - relative to public/
+    const src = `audio/${audioFileName}`;
 
     const meta: VoiceOverMeta = {
       src,
@@ -308,8 +219,17 @@ export async function prerenderAudio(config: PrerenderConfig): Promise<Prerender
       const durationMs = await estimateAudioDuration(audioBuffer);
       const durationFrames = Math.ceil((durationMs / 1000) * fps);
 
-      const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-      const src = URL.createObjectURL(blob);
+      // Save audio file to public/audio/ for staticFile() access
+      const audioDir = path.resolve(process.cwd(), AUDIO_OUTPUT_DIR);
+      if (!fs.existsSync(audioDir)) {
+        fs.mkdirSync(audioDir, { recursive: true });
+      }
+      const audioFileName = `music-${cacheKey.slice(0, 8)}.mp3`;
+      const audioFilePath = path.join(audioDir, audioFileName);
+      fs.writeFileSync(audioFilePath, Buffer.from(audioBuffer));
+
+      // Return path for staticFile() - relative to public/
+      const src = `audio/${audioFileName}`;
 
       maxEndFrame = Math.max(maxEndFrame, durationFrames);
 
@@ -350,8 +270,17 @@ export async function prerenderAudio(config: PrerenderConfig): Promise<Prerender
     const durationMs = await estimateAudioDuration(audioBuffer);
     const durationFrames = Math.ceil((durationMs / 1000) * fps);
 
-    const blob = new Blob([audioBuffer], { type: 'audio/mpeg' });
-    const src = URL.createObjectURL(blob);
+    // Save audio file to public/audio/ for staticFile() access
+    const audioDir = path.resolve(process.cwd(), AUDIO_OUTPUT_DIR);
+    if (!fs.existsSync(audioDir)) {
+      fs.mkdirSync(audioDir, { recursive: true });
+    }
+    const audioFileName = `sfx-${sfx.id}-${cacheKey.slice(0, 8)}.mp3`;
+    const audioFilePath = path.join(audioDir, audioFileName);
+    fs.writeFileSync(audioFilePath, Buffer.from(audioBuffer));
+
+    // Return path for staticFile() - relative to public/
+    const src = `audio/${audioFileName}`;
 
     const endFrame = sfx.from + durationFrames;
     maxEndFrame = Math.max(maxEndFrame, endFrame);

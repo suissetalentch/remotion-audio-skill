@@ -9,6 +9,7 @@ import { BackgroundMusicProps } from '../types';
  */
 export const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
   prompt,
+  src,
   durationSeconds,
   promptInfluence,
   from = 0,
@@ -20,11 +21,18 @@ export const BackgroundMusic: React.FC<BackgroundMusicProps> = ({
 }) => {
   const { durationInFrames } = useVideoConfig();
   const currentFrame = useCurrentFrame();
-  const { audioSrc, isLoading, error } = useBackgroundMusic({
-    prompt,
+
+  // If src is provided, use it directly (prerendered mode)
+  const hookResult = useBackgroundMusic({
+    prompt: prompt || '',
     durationSeconds,
     promptInfluence,
   });
+
+  // Use prerendered src or hook result
+  const audioSrc = src || hookResult.audioSrc;
+  const isLoading = src ? false : hookResult.isLoading;
+  const error = src ? null : hookResult.error;
 
   // Compute volume with fades and ducking
   const computedVolume = useMemo(() => {

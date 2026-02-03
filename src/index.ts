@@ -48,8 +48,9 @@ export { SFXService, getSFXService, resetSFXService } from './services';
 export { STTService, getSTTService, resetSTTService } from './services';
 export type { TTSOptions, MusicOptions, SFXOptions, STTOptions } from './services';
 
-// Cache
-export { CacheManager, getCacheManager, resetCacheManager } from './cache';
+// Cache (browser-safe, memory-only)
+// For Node.js cache with fs, import from 'remotion-audio-skill/server'
+export { BrowserCache, getBrowserCache, resetBrowserCache } from './cache/browser-cache';
 
 // Utils
 export {
@@ -114,8 +115,8 @@ export type {
   SFXPresetName,
 } from './presets';
 
-// Pipeline
-export { prerenderAudio, createSimpleConfig } from './pipeline';
+// Pipeline types only (implementation in 'remotion-audio-skill/server')
+// For prerenderAudio and createSimpleConfig, import from 'remotion-audio-skill/server'
 export type {
   PrerenderConfig,
   PrerenderResult,
@@ -126,4 +127,24 @@ export type {
   BackgroundMusicMeta,
   SoundEffectMeta,
   WordAlignment,
-} from './pipeline';
+} from './pipeline/types';
+
+// Wizard (AI-assisted configuration)
+export {
+  VIDEO_WIZARD,
+  shouldShowQuestion,
+  getActiveQuestions,
+  resolvePresets,
+  getConfigSummary,
+  generateComponentCode,
+  generateConfigSnippet,
+  generatePropsObject,
+} from './wizard';
+export type {
+  WizardQuestion,
+  WizardOption,
+  WizardAnswers,
+  VideoWizardConfig,
+  ResolvedConfig as WizardResolvedConfig,
+  GenerateOptions,
+} from './wizard';

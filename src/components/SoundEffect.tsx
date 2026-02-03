@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Audio, Sequence, delayRender, continueRender } from 'remotion';
 import { getSFXService } from '../services';
-import { getCacheManager } from '../cache';
+import { getBrowserCache } from '../cache/browser-cache';
 import { computeSFXCacheKey } from '../utils';
 import { SoundEffectProps } from '../types';
 
@@ -29,16 +29,16 @@ export const SoundEffect: React.FC<SoundEffectProps> = ({
         handle = delayRender('Generating sound effect');
 
         const sfxService = getSFXService();
-        const cacheManager = getCacheManager();
+        const cache = getBrowserCache();
 
-        // Check cache first
+        // Check cache first (memory-only in browser)
         const cacheKey = computeSFXCacheKey(prompt, durationSeconds);
-        let audioBuffer: ArrayBuffer | null = await cacheManager.get(cacheKey);
+        let audioBuffer: ArrayBuffer | null = await cache.get(cacheKey);
 
         if (!audioBuffer) {
           const response = await sfxService.generateSFX(prompt, { durationSeconds });
           audioBuffer = response.audio;
-          await cacheManager.set(cacheKey, audioBuffer);
+          await cache.set(cacheKey, audioBuffer);
         }
 
         if (cancelled) return;

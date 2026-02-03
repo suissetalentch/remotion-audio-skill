@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { delayRender, continueRender, useVideoConfig } from 'remotion';
 import { getTTSService } from '../services';
 import { getSTTService } from '../services';
-import { getCacheManager } from '../cache';
+import { getBrowserCache } from '../cache/browser-cache';
 import { computeTTSCacheKey } from '../utils';
 import { getConfig } from '../config';
 import { UseVoiceOverResult, VoiceSettings, STTWord } from '../types';
@@ -62,7 +62,7 @@ export function useVoiceOver(options: UseVoiceOverOptions): UseVoiceOverResult {
 
         const config = getConfig();
         const ttsService = getTTSService();
-        const cacheManager = getCacheManager();
+        const cache = getBrowserCache();
 
         const effectiveVoiceId = voiceId || config.defaultVoiceId;
         const effectiveModel = model || config.defaultModel;
@@ -81,7 +81,7 @@ export function useVoiceOver(options: UseVoiceOverOptions): UseVoiceOverResult {
           }
         );
 
-        let audioBuffer: ArrayBuffer | null = await cacheManager.get(cacheKey);
+        let audioBuffer: ArrayBuffer | null = await cache.get(cacheKey);
 
         if (!audioBuffer) {
           // Generate new audio
@@ -96,8 +96,8 @@ export function useVoiceOver(options: UseVoiceOverOptions): UseVoiceOverResult {
           });
           audioBuffer = response.audio;
 
-          // Cache the result
-          await cacheManager.set(cacheKey, audioBuffer);
+          // Cache the result (memory-only in browser)
+          await cache.set(cacheKey, audioBuffer);
         }
 
         if (cancelled) return;

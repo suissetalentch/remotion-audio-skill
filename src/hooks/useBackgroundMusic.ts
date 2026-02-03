@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { delayRender, continueRender } from 'remotion';
 import { getMusicService } from '../services';
-import { getCacheManager } from '../cache';
+import { getBrowserCache } from '../cache/browser-cache';
 import { computeMusicCacheKey } from '../utils';
 import { UseBackgroundMusicResult } from '../types';
 
@@ -39,11 +39,11 @@ export function useBackgroundMusic(
         setError(null);
 
         const musicService = getMusicService();
-        const cacheManager = getCacheManager();
+        const cache = getBrowserCache();
 
-        // Check cache first
+        // Check cache first (memory-only in browser)
         const cacheKey = computeMusicCacheKey(prompt, durationSeconds, promptInfluence);
-        let audioBuffer: ArrayBuffer | null = await cacheManager.get(cacheKey);
+        let audioBuffer: ArrayBuffer | null = await cache.get(cacheKey);
 
         if (!audioBuffer) {
           // Generate new music
@@ -53,8 +53,8 @@ export function useBackgroundMusic(
           });
           audioBuffer = response.audio;
 
-          // Cache the result
-          await cacheManager.set(cacheKey, audioBuffer);
+          // Cache the result (memory-only in browser)
+          await cache.set(cacheKey, audioBuffer);
         }
 
         if (cancelled) return;

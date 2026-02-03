@@ -61,6 +61,133 @@ Audio is generated at build-time, cached intelligently, and synchronized automat
 - **📊 Word Transcription** - Accurate word-level timestamps for perfect caption sync
 - **⚡ Rate Limiting** - Token bucket algorithm prevents API throttling
 - **🔁 Retry Logic** - Exponential backoff with jitter for resilient API calls
+- **🤖 AI-Assisted Setup** - Built-in wizard for Claude and other LLMs to guide configuration
+
+---
+
+## AI-Assisted Setup (for Claude/LLMs)
+
+This library includes a **Video Wizard** that AI assistants can use to guide users through configuration. Instead of asking for technical parameters, the AI asks simple questions about intent.
+
+### How it works
+
+When using Claude Code or another AI assistant:
+
+```
+AI: "What type of video are you creating?"
+You: "A tutorial"
+
+AI: "What type of voice do you prefer?"
+You: "Female, calm and instructional"
+
+AI: "Do you want background music?"
+You: "Yes, lo-fi with auto-ducking"
+
+AI: "Do you want synchronized captions?"
+You: "Yes, word-by-word highlighting"
+```
+
+The AI then generates a complete, configured component using the right presets.
+
+### Programmatic Access
+
+```typescript
+import {
+  VIDEO_WIZARD,
+  resolvePresets,
+  generateComponentCode,
+  getConfigSummary
+} from 'remotion-audio-skill';
+
+// Get all wizard questions
+console.log(VIDEO_WIZARD.questions);
+
+// Resolve user answers to configuration
+const config = resolvePresets({
+  video_type: 'tutorial',
+  voice_gender: 'female',
+  voice_style: 'calm',
+  language: 'en',
+  background_music: 'ducking',
+  music_style: 'lofi',
+  captions: 'word-highlight'
+});
+
+// Get human-readable summary
+console.log(getConfigSummary(config));
+
+// Generate ready-to-use component code
+const code = generateComponentCode(config, {
+  componentName: 'MyTutorial',
+  textPlaceholder: 'Welcome to this tutorial...'
+});
+```
+
+### Available Wizard Questions
+
+| Question | Options |
+|----------|---------|
+| Video Type | Tutorial, Marketing, Documentary, Social, Corporate |
+| Voice Gender | Female, Male, No preference |
+| Voice Style | Warm, Energetic, Calm, Conversational, Dramatic |
+| Language | English, French, German, Spanish, + more |
+| Background Music | With ducking, Constant, None |
+| Music Style | Lo-fi, Corporate, Cinematic, Ambient, Energetic |
+| Captions | Word highlight, Sentence, Karaoke, None |
+
+### Claude Code Skill Installation
+
+This library includes a native **Claude Code skill** that enables the `/remotion-audio` command. When installed, you can simply type `/remotion-audio` in Claude Code to launch the interactive wizard.
+
+#### Option 1: Using the install script (recommended)
+
+After installing the package in your project:
+
+```bash
+npx remotion-audio-install-skill
+```
+
+This creates a symlink from `~/.claude/skills/remotion-audio-skill` to the package.
+
+#### Option 2: Manual symlink
+
+```bash
+# From your project directory
+ln -s ./node_modules/remotion-audio-skill ~/.claude/skills/remotion-audio-skill
+
+# Or link directly to a cloned repo
+ln -s /path/to/remotion-audio-skill ~/.claude/skills/remotion-audio-skill
+```
+
+#### Option 3: Global installation
+
+```bash
+npm install -g remotion-audio-skill
+remotion-audio-install-skill
+```
+
+#### Verify Installation
+
+```bash
+ls -la ~/.claude/skills/
+# Should show: remotion-audio-skill -> /path/to/package
+```
+
+#### Using the Skill
+
+Once installed, in any Claude Code session:
+
+```
+/remotion-audio
+```
+
+Claude will guide you through:
+1. Video type selection (tutorial, marketing, documentary, etc.)
+2. Voice preferences (gender, style, language)
+3. Background music options (with/without ducking)
+4. Caption style selection
+
+Then generate a complete, ready-to-use React component.
 
 ---
 
@@ -81,77 +208,126 @@ npm install remotion-audio-skill
 
 ## Quick Start
 
-### 1. Configure the Library
+### 1. Set Environment Variables
 
-Create a configuration file or add to your `remotion.config.ts`:
+```bash
+# Add to .env file
+ELEVENLABS_API_KEY=your_api_key_here
+```
+
+### 2. Create a Prerender Script
+
+Create `scripts/prerender-audio.ts`:
 
 ```typescript
 import { configureAudioSkill } from 'remotion-audio-skill';
+import { prerenderAudio } from 'remotion-audio-skill/server';
+import * as fs from 'fs';
+import * as path from 'path';
 
-configureAudioSkill({
-  apiKey: process.env.ELEVENLABS_API_KEY!,
-  cacheDir: './.remotion-audio-cache',
-  defaultVoiceId: 'aria',
-  defaultModel: 'eleven_multilingual_v2',
-});
+// Load .env
+const envPath = path.resolve(__dirname, '../.env');
+if (fs.existsSync(envPath)) {
+  fs.readFileSync(envPath, 'utf-8').split('\n').forEach(line => {
+    const [key, value] = line.split('=');
+    if (key && value) process.env[key.trim()] = value.trim();
+  });
+}
+
+async function main() {
+  configureAudioSkill({ apiKey: process.env.ELEVENLABS_API_KEY! });
+
+  const result = await prerenderAudio({
+    fps: 30,
+    voiceOvers: [{
+      id: 'main',
+      text: 'Welcome to my video! This voice was generated by AI.',
+      voiceId: 'bIHbv24MWmeRgasZH58o', // Will (calm, male)
+      language: 'en',
+    }],
+  });
+
+  // Save metadata for the component
+  const metaPath = path.resolve(__dirname, '../public/audio/meta.json');
+  fs.mkdirSync(path.dirname(metaPath), { recursive: true });
+  fs.writeFileSync(metaPath, JSON.stringify(result, null, 2));
+
+  console.log(`✅ Audio generated! Duration: ${result.totalDurationFrames} frames`);
+}
+
+main().catch(console.error);
 ```
 
-### 2. Create Your First Video
+### 3. Create Your Video Component
 
 ```tsx
-import { AbsoluteFill } from 'remotion';
-import { VoiceOver, BackgroundMusic, AutoCaption, useVoiceOverRef } from 'remotion-audio-skill';
+import { AbsoluteFill, Audio, Sequence, staticFile } from 'remotion';
+import type { PrerenderResult } from 'remotion-audio-skill';
 
-export const MyVideo: React.FC = () => {
-  const voiceRef = useVoiceOverRef();
+interface Props {
+  audioMeta?: PrerenderResult['audioMeta'];
+}
+
+export const MyVideo: React.FC<Props> = ({ audioMeta }) => {
+  const voiceMeta = audioMeta?.voiceOvers['main'];
 
   return (
     <AbsoluteFill style={{ backgroundColor: '#000' }}>
-      <BackgroundMusic
-        prompt="upbeat corporate technology"
-        volume={0.3}
-        loop
-        ducking={{
-          enabled: true,
-          triggerRef: voiceRef,
-          duckTo: 0.1,
-          attackFrames: 8,
-          releaseFrames: 15
-        }}
-      />
-
-      <VoiceOver
-        ref={voiceRef}
-        text="Welcome to the future of video creation with AI-powered audio!"
-        voiceId="aria"
-        language="en"
-        from={30}
-      />
-
-      <AutoCaption
-        audioRef={voiceRef}
-        style="word-highlight"
-        fontSize={48}
-        highlightColor="#FFD700"
-      />
+      {voiceMeta && (
+        <Sequence from={0} durationInFrames={voiceMeta.durationFrames}>
+          <Audio src={staticFile(voiceMeta.src)} volume={1} />
+        </Sequence>
+      )}
+      {/* Your visual content here */}
     </AbsoluteFill>
   );
 };
 ```
 
-### 3. Set Environment Variables
+### 4. Register the Composition
 
-```bash
-export ELEVENLABS_API_KEY=your_api_key_here
+In `src/Root.tsx`:
+
+```tsx
+import { Composition, staticFile } from 'remotion';
+import { MyVideo } from './MyVideo';
+
+export const RemotionRoot = () => (
+  <Composition
+    id="MyVideo"
+    component={MyVideo}
+    durationInFrames={300}
+    fps={30}
+    width={1920}
+    height={1080}
+    defaultProps={{ audioMeta: { voiceOvers: {}, backgroundMusic: null, soundEffects: {} } }}
+    calculateMetadata={async ({ props }) => {
+      try {
+        const response = await fetch(staticFile('audio/meta.json'));
+        const result = await response.json();
+        return {
+          durationInFrames: result.totalDurationFrames + 30,
+          props: { ...props, audioMeta: result.audioMeta },
+        };
+      } catch {
+        return { props };
+      }
+    }}
+  />
+);
 ```
 
-### 4. Run Remotion Studio
+### 5. Generate Audio and Render
 
 ```bash
-npx remotion studio
+# Step 1: Generate audio files
+npx tsx scripts/prerender-audio.ts
+
+# Step 2: Render video
+npx remotion render MyVideo out/video.mp4
 ```
 
-That's it! Your audio will be generated, cached, and synchronized automatically.
+That's it! The audio is generated once and cached in `public/audio/`.
 
 ---
 
@@ -503,57 +679,60 @@ const cached = await cache.get(key);
 await cache.set(key, audioBuffer, { ttl: 30 });
 ```
 
-### Pipeline Prerendering
+### Two Workflows
 
-For advanced workflows, prerender all audio in `calculateMetadata`:
+**1. Prerender Workflow (Recommended for final render)**
+
+Generate audio files before rendering. This is the recommended approach for production:
+
+```bash
+# Step 1: Run prerender script (calls ElevenLabs API)
+npx tsx scripts/prerender-audio.ts
+
+# Step 2: Render video (uses cached audio files)
+npx remotion render MyVideo out/video.mp4
+```
+
+The prerender script saves audio to `public/audio/` and metadata to `public/audio/meta.json`. The component loads this via `staticFile()`.
+
+**2. Live Hooks Workflow (For Remotion Studio preview)**
+
+Use hooks directly in components for interactive development:
 
 ```tsx
-import { Composition } from 'remotion';
-import { prerenderAudio } from 'remotion-audio-skill';
+import { useVoiceOver, useBackgroundMusic } from 'remotion-audio-skill';
 
-export const MyComposition = () => (
-  <Composition
-    id="my-video"
-    component={MyVideo}
-    fps={30}
-    width={1920}
-    height={1080}
-    durationInFrames={300}
-    calculateMetadata={async ({ props }) => {
-      const result = await prerenderAudio({
-        fps: 30,
-        voiceOvers: [
-          {
-            id: 'intro',
-            text: 'Welcome to my video!',
-            preset: 'narrator-warm'
-          },
-          {
-            id: 'outro',
-            text: 'Thanks for watching!',
-            voiceId: 'aria'
-          },
-        ],
-        backgroundMusic: {
-          prompt: 'tech-corporate',
-          durationSeconds: 120,
-        },
-        soundEffects: [
-          {
-            id: 'transition',
-            preset: 'transition-whoosh',
-            from: 60
-          },
-        ],
-      });
+const { audioSrc, isLoading } = useVoiceOver({
+  text: "Hello world!",
+  voiceId: "aria",
+});
+```
 
-      return {
-        durationInFrames: result.totalDurationFrames,
-        props: { ...props, audioMeta: result.audioMeta },
-      };
-    }}
-  />
-);
+Note: Live hooks require browser-compatible caching and may not work with `remotion render`. Use prerender workflow for final output.
+
+### Prerender API
+
+```typescript
+import { prerenderAudio } from 'remotion-audio-skill/server';
+
+const result = await prerenderAudio({
+  fps: 30,
+  voiceOvers: [
+    {
+      id: 'intro',
+      text: 'Welcome to my video!',
+      voiceId: 'bIHbv24MWmeRgasZH58o',
+      language: 'en',
+    },
+  ],
+  backgroundMusic: {
+    prompt: 'lo-fi chill beats',
+    durationSeconds: 60,
+  },
+});
+
+// result.audioMeta contains paths to generated files
+// result.totalDurationFrames contains total duration
 ```
 
 ---

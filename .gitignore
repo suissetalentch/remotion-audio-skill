@@ -40,6 +40,7 @@ test-output/
 # Example output
 example/out/
 example/node_modules/
+example/public/audio/
 
 # Logs
 *.log

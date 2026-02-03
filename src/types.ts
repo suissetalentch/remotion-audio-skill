@@ -107,7 +107,12 @@ export interface CacheOptions {
 // ============================================================================
 
 export interface VoiceOverProps {
+  /** Text to speak (required if src not provided) */
   text: string;
+  /** Pre-rendered audio source URL (from calculateMetadata/prerenderAudio). Use staticFile() for local files. */
+  src?: string;
+  /** Duration in frames (required when using src) */
+  durationInFrames?: number;
   voiceId?: string;
   model?: string;
   voiceSettings?: VoiceSettings;
@@ -133,7 +138,10 @@ export interface VoiceOverProps {
 }
 
 export interface BackgroundMusicProps {
-  prompt: string;
+  /** Prompt for music generation (required if src not provided) */
+  prompt?: string;
+  /** Pre-rendered audio source URL (from calculateMetadata/prerenderAudio). Use staticFile() for local files. */
+  src?: string;
   durationSeconds?: number;
   promptInfluence?: number;
   from?: number;
