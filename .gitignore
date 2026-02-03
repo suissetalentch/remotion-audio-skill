@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+build/
+
+# Cache
+.remotion-audio-cache/
+.cache/
+.turbo/
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+credentials
+credentials.*
+*.key
+*.pem
+.secret*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage/
+test-output/
+.nyc_output/
+
+# Example output
+example/out/
+example/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Archives
+*.zip
+*.tar.gz
+*.tgz
+*.rar
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# PRD and internal docs
+*-prd.md
+*.prd.md
